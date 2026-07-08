@@ -1,17 +1,38 @@
-import { useState } from 'react';
-import { Plus, Search, Filter, MoreVertical, CreditCard } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Search, Filter, MoreVertical, CreditCard, Edit, PauseCircle, Trash2, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 export default function Subscriptions() {
   const [search, setSearch] = useState('');
+  const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
 
-  const subscriptions = [
-    { id: 1, name: 'Figma Professional', category: 'Software', cost: 15.00, billing: 'Monthly', status: 'Active', method: 'Visa ending in 4242', logo: '🎨' },
-    { id: 2, name: 'AWS Cloud Services', category: 'Infrastructure', cost: 42.18, billing: 'Monthly', status: 'Active', method: 'Mastercard ending in 8812', logo: '☁️' },
-    { id: 3, name: 'Netflix Premium', category: 'Entertainment', cost: 22.99, billing: 'Monthly', status: 'Active', method: 'Pulse Virtual Card', logo: '🍿' },
-    { id: 4, name: 'Supabase Pro', category: 'Infrastructure', cost: 25.00, billing: 'Monthly', status: 'Active', method: 'Visa ending in 4242', logo: '⚡' },
-    { id: 5, name: 'Vercel Hobby', category: 'Infrastructure', cost: 0.00, billing: 'Monthly', status: 'Active', method: 'None', logo: '▲' },
-    { id: 6, name: 'Adobe Creative Cloud', category: 'Software', cost: 54.99, billing: 'Monthly', status: 'Paused', method: 'Visa ending in 4242', logo: '🖌️' }
-  ];
+  const [subscriptions, setSubscriptions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const handleClickOutside = () => setActiveDropdown(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    fetchSubscriptions();
+  }, []);
+
+  const fetchSubscriptions = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('orbit_subscriptions')
+      .select('*')
+      .order('created_at', { ascending: false });
+      
+    if (error) {
+      console.error('Error fetching subscriptions:', error);
+    } else {
+      setSubscriptions(data || []);
+    }
+    setIsLoading(false);
+  };
 
   const filteredSubs = subscriptions.filter(sub => sub.name.toLowerCase().includes(search.toLowerCase()));
 
@@ -56,56 +77,90 @@ export default function Subscriptions() {
           </button>
         </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ backgroundColor: 'var(--bg-base)', borderBottom: '1px solid var(--border-subtle)' }}>
-              <th style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.85rem', width: '35%' }}>Service Provider</th>
-              <th style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.85rem' }}>Cost</th>
-              <th style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.85rem' }}>Payment Method</th>
-              <th style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.85rem' }}>Status</th>
-              <th style={{ padding: '16px 24px', width: '60px' }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredSubs.map((sub, i) => (
-              <tr key={sub.id} style={{ borderBottom: i !== filteredSubs.length - 1 ? '1px solid var(--border-subtle)' : 'none', transition: 'background-color 0.2s', backgroundColor: 'transparent' }} className="hover-row">
-                <td style={{ padding: '16px 24px' }}>
-                  <div className="flex-center" style={{ gap: '16px', justifyContent: 'flex-start' }}>
-                    <div style={{ fontSize: '1.2rem', width: '36px', height: '36px', backgroundColor: 'var(--bg-base)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                      {sub.logo}
-                    </div>
-                    <div>
-                      <h4 style={{ margin: 0, fontWeight: 600 }}>{sub.name}</h4>
-                      <span className="text-secondary" style={{ fontSize: '0.8rem' }}>{sub.category}</span>
-                    </div>
-                  </div>
-                </td>
-                <td style={{ padding: '16px 24px' }}>
-                  <h4 style={{ margin: 0 }}>${sub.cost.toFixed(2)}</h4>
-                  <span className="text-secondary" style={{ fontSize: '0.8rem' }}>{sub.billing}</span>
-                </td>
-                <td style={{ padding: '16px 24px' }}>
-                  <div className="flex-center" style={{ justifyContent: 'flex-start', gap: '8px' }}>
-                    <CreditCard size={16} className="text-tertiary" />
-                    <span style={{ fontSize: '0.9rem' }}>{sub.method}</span>
-                  </div>
-                </td>
-                <td style={{ padding: '16px 24px' }}>
-                  <span className={`badge ${sub.status === 'Active' ? 'badge-success' : ''}`} style={{ 
-                    ...(sub.status !== 'Active' ? { backgroundColor: 'var(--bg-base)', color: 'var(--text-secondary)', border: '1px solid var(--border-strong)' } : {})
-                  }}>
-                    {sub.status}
-                  </span>
-                </td>
-                <td style={{ padding: '16px 24px', textAlign: 'center' }}>
-                  <button className="btn-icon">
-                    <MoreVertical size={18} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        {isLoading ? (
+          <div style={{ padding: '64px 24px', textAlign: 'center' }}>
+            <Loader2 size={32} className="text-primary animate-spin" style={{ margin: '0 auto 16px', animation: 'spin 1s linear infinite' }} />
+            <p className="text-secondary">Loading subscriptions...</p>
+          </div>
+        ) : filteredSubs.length > 0 ? (
+          <div className="responsive-table-wrapper">
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <thead>
+                <tr style={{ backgroundColor: 'var(--bg-base)', borderBottom: '1px solid var(--border-subtle)' }}>
+                  <th style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.85rem', width: '35%' }}>Service Provider</th>
+                  <th style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.85rem' }}>Cost</th>
+                  <th style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.85rem' }}>Payment Method</th>
+                  <th style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontWeight: 500, fontSize: '0.85rem' }}>Status</th>
+                  <th style={{ padding: '16px 24px', width: '60px' }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSubs.map((sub, i) => (
+                  <tr key={sub.id} style={{ borderBottom: i !== filteredSubs.length - 1 ? '1px solid var(--border-subtle)' : 'none', transition: 'background-color 0.2s', backgroundColor: 'transparent' }} className="hover-row">
+                    <td style={{ padding: '16px 24px' }}>
+                      <div className="flex-center" style={{ gap: '16px', justifyContent: 'flex-start' }}>
+                        <div style={{ fontSize: '1.2rem', width: '36px', height: '36px', backgroundColor: 'var(--bg-base)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                          {sub.logo_emoji || '📦'}
+                        </div>
+                        <div>
+                          <h4 style={{ margin: 0, fontWeight: 600 }}>{sub.name}</h4>
+                          <span className="text-secondary" style={{ fontSize: '0.8rem' }}>{sub.category}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '16px 24px' }}>
+                      <h4 style={{ margin: 0 }}>${sub.cost ? Number(sub.cost).toFixed(2) : '0.00'}</h4>
+                      <span className="text-secondary" style={{ fontSize: '0.8rem' }}>{sub.billing_cycle}</span>
+                    </td>
+                    <td style={{ padding: '16px 24px' }}>
+                      <div className="flex-center" style={{ justifyContent: 'flex-start', gap: '8px' }}>
+                        <CreditCard size={16} className="text-tertiary" />
+                        <span style={{ fontSize: '0.9rem' }}>{sub.payment_method || 'N/A'}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '16px 24px' }}>
+                      <span className={`badge ${sub.status === 'Active' ? 'badge-success' : ''}`} style={{ 
+                        ...(sub.status !== 'Active' ? { backgroundColor: 'var(--bg-base)', color: 'var(--text-secondary)', border: '1px solid var(--border-strong)' } : {})
+                      }}>
+                        {sub.status}
+                      </span>
+                    </td>
+                    <td style={{ padding: '16px 24px', textAlign: 'center', position: 'relative' }} className="dropdown-container">
+                      <button className="btn-icon" onClick={(e) => { e.stopPropagation(); setActiveDropdown(activeDropdown === sub.id ? null : sub.id); }}>
+                        <MoreVertical size={18} />
+                      </button>
+                      {activeDropdown === sub.id && (
+                        <div className="dropdown-menu" onClick={(e) => e.stopPropagation()}>
+                          <button className="dropdown-item">
+                            <Edit size={14} /> Edit
+                          </button>
+                          <button className="dropdown-item">
+                            <PauseCircle size={14} /> Pause
+                          </button>
+                          <button className="dropdown-item danger">
+                            <Trash2 size={14} /> Delete
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div style={{ padding: '64px 24px', textAlign: 'center' }}>
+            <div style={{ width: '64px', height: '64px', backgroundColor: 'var(--bg-base)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', border: '1px solid var(--border-subtle)' }}>
+              <CreditCard size={32} className="text-tertiary" />
+            </div>
+            <h3 style={{ marginBottom: '8px' }}>No Subscriptions Found</h3>
+            <p className="text-secondary" style={{ marginBottom: '24px', maxWidth: '400px', margin: '0 auto 24px' }}>You aren't tracking any subscriptions yet. Add your first service to start monitoring your recurring spend.</p>
+            <button className="btn btn-primary">
+              <Plus size={18} />
+              Add Subscription
+            </button>
+          </div>
+        )}
         <style>{`
           .hover-row:hover { background-color: var(--bg-surface-hover) !important; cursor: pointer; }
         `}</style>

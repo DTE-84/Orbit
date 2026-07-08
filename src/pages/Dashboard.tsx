@@ -1,4 +1,14 @@
 import { Activity, CreditCard, Shield, TrendingUp, AlertCircle } from 'lucide-react';
+import { AreaChart, Area, ResponsiveContainer } from 'recharts';
+
+const spendData = [
+  { name: 'Jan', spend: 90 },
+  { name: 'Feb', spend: 110 },
+  { name: 'Mar', spend: 105 },
+  { name: 'Apr', spend: 120 },
+  { name: 'May', spend: 135 },
+  { name: 'Jun', spend: 142.98 },
+];
 
 export default function Dashboard() {
   return (
@@ -15,7 +25,7 @@ export default function Dashboard() {
       </div>
 
       <div className="stats-grid delay-1">
-        <div className="glass-panel">
+        <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="flex-between mb-2">
             <h3 className="text-secondary">Monthly Spend</h3>
             <div style={{ padding: '8px', backgroundColor: 'var(--primary-transparent)', borderRadius: '12px' }}>
@@ -23,9 +33,23 @@ export default function Dashboard() {
             </div>
           </div>
           <h2 style={{ fontSize: '2.5rem', marginBottom: '8px' }}>$142.98</h2>
-          <div className="flex-center" style={{ justifyContent: 'flex-start', gap: '8px' }}>
+          <div className="flex-center" style={{ justifyContent: 'flex-start', gap: '8px', marginBottom: '16px' }}>
             <span className="badge badge-success">-4.2%</span>
             <span className="text-tertiary" style={{ fontSize: '0.85rem' }}>vs last month</span>
+          </div>
+          
+          <div style={{ flex: 1, minHeight: '80px', width: '100%', marginTop: 'auto', marginLeft: '-12px', marginRight: '-12px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={spendData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <Area type="monotone" dataKey="spend" stroke="var(--primary)" strokeWidth={2} fillOpacity={1} fill="url(#colorSpend)" />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
 

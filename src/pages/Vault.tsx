@@ -1,26 +1,66 @@
-import { useState } from 'react';
-import { Plus, Shield, Lock, Eye, EyeOff, Copy, ExternalLink, Check, MoreVertical } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Shield, Lock, Eye, EyeOff, Copy, ExternalLink, Check, MoreVertical, Edit, Trash2, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 export default function Vault() {
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [revealedId, setRevealedId] = useState<number | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
+  const [pinPromptFor, setPinPromptFor] = useState<number | null>(null);
+  const [pin, setPin] = useState('');
+  const [credentials, setCredentials] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const credentials = [
-    { id: 1, service: 'Figma', username: 'drew@dte.solutions', url: 'figma.com' },
-    { id: 2, service: 'AWS Console', username: 'admin-dte', url: 'aws.amazon.com' },
-    { id: 3, service: 'Supabase', username: 'drew@dte.solutions', url: 'supabase.com' },
-    { id: 4, service: 'Vercel', username: 'dte-llc', url: 'vercel.com' },
-    { id: 5, service: 'Bank of America', username: 'drew.business', url: 'bankofamerica.com' }
-  ];
+  useEffect(() => {
+    const handleClickOutside = () => setActiveDropdown(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
-  const handleCopy = (id: number) => {
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-    // In real app, write to clipboard
+  useEffect(() => {
+    fetchCredentials();
+  }, []);
+
+  const fetchCredentials = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('orbit_vault')
+      .select('*')
+      .order('created_at', { ascending: false });
+      
+    if (error) {
+      console.error('Error fetching vault credentials:', error);
+    } else {
+      setCredentials(data || []);
+    }
+    setIsLoading(false);
+  };
+
+  const handleCopy = (id: number, type: 'password' | 'username') => {
+    const cred = credentials.find(c => c.id === id);
+    if (cred) {
+      const textToCopy = type === 'password' ? cred.encrypted_password : cred.username;
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2000);
+      });
+    }
   };
 
   const toggleReveal = (id: number) => {
-    setRevealedId(revealedId === id ? null : id);
+    if (revealedId === id) {
+      setRevealedId(null);
+    } else {
+      setPinPromptFor(id);
+      setPin('');
+    }
+  };
+
+  const submitPin = () => {
+    if (pin.length >= 4) { // Dummy validation
+      setRevealedId(pinPromptFor);
+      setPinPromptFor(null);
+    }
   };
 
   return (
@@ -50,57 +90,103 @@ export default function Vault() {
         </div>
       </div>
 
-      <div className="grid-cards delay-2">
-        {credentials.map((cred) => (
-          <div key={cred.id} className="glass-panel" style={{ padding: '20px' }}>
-            <div className="flex-between mb-3">
-              <div className="flex-center" style={{ gap: '12px', justifyContent: 'flex-start' }}>
-                <div style={{ width: '40px', height: '40px', backgroundColor: 'var(--bg-base)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-subtle)' }}>
-                  <Lock size={18} className="text-secondary" />
+      {isLoading ? (
+        <div style={{ padding: '64px 24px', textAlign: 'center' }}>
+          <Loader2 size={32} className="text-primary animate-spin" style={{ margin: '0 auto 16px', animation: 'spin 1s linear infinite' }} />
+          <p className="text-secondary">Decrypting vault contents...</p>
+        </div>
+      ) : credentials.length > 0 ? (
+        <div className="grid-cards delay-2">
+          {credentials.map((cred) => (
+            <div key={cred.id} className="glass-panel" style={{ padding: '20px' }}>
+              <div className="flex-between mb-3 dropdown-container">
+                <div className="flex-center" style={{ gap: '12px', justifyContent: 'flex-start' }}>
+                  <div style={{ width: '40px', height: '40px', backgroundColor: 'var(--bg-base)', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-subtle)' }}>
+                    <Lock size={18} className="text-secondary" />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{cred.service}</h3>
+                    <a href={`https://${cred.url}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      {cred.url} <ExternalLink size={10} />
+                    </a>
+                  </div>
                 </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{cred.service}</h3>
-                  <a href={`https://${cred.url}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-tertiary)', fontSize: '0.8rem', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    {cred.url} <ExternalLink size={10} />
-                  </a>
-                </div>
-              </div>
-              <button className="btn-icon">
-                <MoreVertical size={18} />
-              </button>
-            </div>
-            
-            <div style={{ backgroundColor: 'var(--bg-base)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ marginBottom: '16px' }}>
-                <span className="text-secondary" style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Username / Email</span>
-                <div className="flex-between mt-1">
-                  <span style={{ fontSize: '0.95rem', fontFamily: 'monospace' }}>{cred.username}</span>
-                  <button className="btn-icon" style={{ padding: '4px' }}>
-                    <Copy size={14} />
-                  </button>
-                </div>
+                <button className="btn-icon" onClick={(e) => { e.stopPropagation(); setActiveDropdown(activeDropdown === cred.id ? null : cred.id); }}>
+                  <MoreVertical size={18} />
+                </button>
+                {activeDropdown === cred.id && (
+                  <div className="dropdown-menu" onClick={(e) => e.stopPropagation()} style={{ right: 0, top: '40px' }}>
+                    <button className="dropdown-item">
+                      <Edit size={14} /> Edit
+                    </button>
+                    <button className="dropdown-item danger">
+                      <Trash2 size={14} /> Delete
+                    </button>
+                  </div>
+                )}
               </div>
               
-              <div>
-                <span className="text-secondary" style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Password</span>
-                <div className="flex-between mt-1">
-                  <span style={{ fontSize: '0.95rem', fontFamily: 'monospace', color: revealedId === cred.id ? 'var(--text-primary)' : 'var(--text-tertiary)', letterSpacing: revealedId === cred.id ? 'normal' : '2px' }}>
-                    {revealedId === cred.id ? 'c0mpl3xP@ssw0rd!2026' : '••••••••••••••••'}
-                  </span>
-                  <div className="flex-center" style={{ gap: '8px' }}>
-                    <button className="btn-icon" style={{ padding: '4px' }} onClick={() => toggleReveal(cred.id)}>
-                      {revealedId === cred.id ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
-                    <button className="btn-icon" style={{ padding: '4px' }} onClick={() => handleCopy(cred.id)}>
-                      {copiedId === cred.id ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+              <div style={{ backgroundColor: 'var(--bg-base)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ marginBottom: '16px' }}>
+                  <span className="text-secondary" style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Username / Email</span>
+                  <div className="flex-between mt-1">
+                    <span style={{ fontSize: '0.95rem', fontFamily: 'monospace' }}>{cred.username}</span>
+                    <button className="btn-icon" style={{ padding: '4px' }} onClick={() => handleCopy(cred.id, 'username')}>
+                      <Copy size={14} />
                     </button>
                   </div>
                 </div>
+                
+                <div>
+                  <span className="text-secondary" style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Password</span>
+                  <div className="flex-between mt-1">
+                    <span style={{ fontSize: '0.95rem', fontFamily: 'monospace', color: revealedId === cred.id ? 'var(--text-primary)' : 'var(--text-tertiary)', letterSpacing: revealedId === cred.id ? 'normal' : '2px' }}>
+                      {revealedId === cred.id ? cred.encrypted_password : '••••••••••••••••'}
+                    </span>
+                    <div className="flex-center" style={{ gap: '8px' }}>
+                      <button className="btn-icon" style={{ padding: '4px' }} onClick={() => toggleReveal(cred.id)}>
+                        {revealedId === cred.id ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                      <button className="btn-icon" style={{ padding: '4px' }} onClick={() => handleCopy(cred.id, 'password')}>
+                        {copiedId === cred.id ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {pinPromptFor === cred.id && (
+                  <div style={{ marginTop: '12px', padding: '12px', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '8px', border: '1px solid var(--border-gold)' }}>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--primary)', marginBottom: '8px' }}>Master PIN required for decryption</p>
+                    <div className="flex-between" style={{ gap: '8px' }}>
+                      <input 
+                        type="password" 
+                        value={pin}
+                        onChange={(e) => setPin(e.target.value)}
+                        placeholder="••••"
+                        style={{ flex: 1, padding: '8px 12px', backgroundColor: 'var(--bg-base)', border: '1px solid var(--border-subtle)', borderRadius: '8px', color: 'var(--text-primary)', outline: 'none' }}
+                        autoFocus
+                        onKeyDown={(e) => e.key === 'Enter' && submitPin()}
+                      />
+                      <button className="btn btn-primary" style={{ padding: '8px 16px' }} onClick={submitPin}>Verify</button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+          ))}
+        </div>
+      ) : (
+        <div className="glass-panel delay-2" style={{ padding: '64px 24px', textAlign: 'center' }}>
+          <div style={{ width: '64px', height: '64px', backgroundColor: 'var(--bg-base)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', border: '1px solid var(--border-subtle)' }}>
+            <Lock size={32} className="text-tertiary" />
           </div>
-        ))}
-      </div>
+          <h3 style={{ marginBottom: '8px' }}>Vault is Empty</h3>
+          <p className="text-secondary" style={{ marginBottom: '24px', maxWidth: '400px', margin: '0 auto 24px' }}>Your zero-knowledge vault is ready. Add your first credential to secure it with client-side AES-256 encryption.</p>
+          <button className="btn btn-primary">
+            <Plus size={18} />
+            New Credential
+          </button>
+        </div>
+      )}
     </div>
   );
 }
